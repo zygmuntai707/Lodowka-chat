@@ -55,6 +55,13 @@
       color: black;
     }
 
+    .system {
+      align-self: center;
+      background: #eee;
+      color: #444;
+      font-size: 14px;
+    }
+
     #inputBar {
       display: flex;
       padding: 10px;
@@ -84,6 +91,11 @@
       flex-shrink: 0;
     }
 
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
     #sendBtn {
       background: #2ecc71;
     }
@@ -108,9 +120,17 @@
   </div>
 
   <script>
+    const WEBHOOK_URL = 'https://primary-production-fb3d1.up.railway.app/webhook-test/ea0f0408-3c60-4580-bb5c-bd138cb2ad8b';
+
     const chat = document.getElementById('chat');
     const textInput = document.getElementById('textInput');
     const sendBtn = document.getElementById('sendBtn');
+
+    let sessionId = localStorage.getItem('lodowka_session_id');
+    if (!sessionId) {
+      sessionId = 'session-' + crypto.randomUUID();
+      localStorage.setItem('lodowka_session_id', sessionId);
+    }
 
     function addMessage(text, type) {
       const msg = document.createElement('div');
@@ -120,13 +140,56 @@
       chat.scrollTop = chat.scrollHeight;
     }
 
-    function sendMessage() {
+    function setSendingState(isSending) {
+      sendBtn.disabled = isSending;
+      textInput.disabled = isSending;
+    }
+
+    async function sendMessage() {
       const text = textInput.value.trim();
       if (!text) return;
 
       addMessage(text, 'user');
       textInput.value = '';
-      textInput.focus();
+      setSendingState(true);
+      addMessage('Przetwarzam...', 'system');
+
+      try {
+        const response = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            session_id: sessionId,
+            message_type: 'text',
+            message: text
+          })
+        });
+
+        const systemMessages = chat.querySelectorAll('.system');
+        if (systemMessages.length > 0) {
+          systemMessages[systemMessages.length - 1].remove();
+        }
+
+        if (!response.ok) {
+          throw new Error('Błąd HTTP: ' + response.status);
+        }
+
+        const data = await response.json();
+        const replyText = data.reply_text ?? data.output ?? 'Brak odpowiedzi.';
+        addMessage(replyText, 'bot');
+      } catch (error) {
+        const systemMessages = chat.querySelectorAll('.system');
+        if (systemMessages.length > 0) {
+          systemMessages[systemMessages.length - 1].remove();
+        }
+        addMessage('Błąd połączenia z serwerem.', 'bot');
+        console.error(error);
+      } finally {
+        setSendingState(false);
+        textInput.focus();
+      }
     }
 
     sendBtn.addEventListener('click', sendMessage);
