@@ -103,6 +103,10 @@
     #micBtn {
       background: #e67e22;
     }
+
+    #micBtn.recording {
+      background: #c0392b;
+    }
   </style>
 </head>
 
@@ -120,11 +124,13 @@
   </div>
 
   <script>
+    // WSTAW TU PRODUKCYJNY WEBHOOK, NIE webhook-test
     const WEBHOOK_URL = 'https://primary-production-fb3d1.up.railway.app/webhook/ea0f0408-3c60-4580-bb5c-bd138cb2ad8b';
 
     const chat = document.getElementById('chat');
     const textInput = document.getElementById('textInput');
     const sendBtn = document.getElementById('sendBtn');
+    const micBtn = document.getElementById('micBtn');
 
     let sessionId = localStorage.getItem('lodowka_session_id');
     if (!sessionId) {
@@ -138,15 +144,28 @@
       msg.textContent = text;
       chat.appendChild(msg);
       chat.scrollTop = chat.scrollHeight;
+      return msg;
+    }
+
+    function removeLastSystemMessage() {
+      const systemMessages = chat.querySelectorAll('.system');
+      if (systemMessages.length > 0) {
+        systemMessages[systemMessages.length - 1].remove();
+      }
     }
 
     function setSendingState(isSending) {
       sendBtn.disabled = isSending;
       textInput.disabled = isSending;
+      if (isSending) {
+        micBtn.disabled = true;
+      } else {
+        micBtn.disabled = false;
+      }
     }
 
-    async function sendMessage() {
-      const text = textInput.value.trim();
+    async function sendMessage(customText = null) {
+      const text = (customText ?? textInput.value).trim();
       if (!text) return;
 
       addMessage(text, 'user');
@@ -167,10 +186,7 @@
           })
         });
 
-        const systemMessages = chat.querySelectorAll('.system');
-        if (systemMessages.length > 0) {
-          systemMessages[systemMessages.length - 1].remove();
-        }
+        removeLastSystemMessage();
 
         if (!response.ok) {
           throw new Error('Błąd HTTP: ' + response.status);
@@ -180,10 +196,7 @@
         const replyText = data.reply_text ?? data.output ?? 'Brak odpowiedzi.';
         addMessage(replyText, 'bot');
       } catch (error) {
-        const systemMessages = chat.querySelectorAll('.system');
-        if (systemMessages.length > 0) {
-          systemMessages[systemMessages.length - 1].remove();
-        }
+        removeLastSystemMessage();
         addMessage('Błąd połączenia z serwerem.', 'bot');
         console.error(error);
       } finally {
@@ -192,7 +205,7 @@
       }
     }
 
-    sendBtn.addEventListener('click', sendMessage);
+    sendBtn.addEventListener('click', () => sendMessage());
 
     textInput.addEventListener('keydown', function (event) {
       if (event.key === 'Enter') {
@@ -200,6 +213,94 @@
         sendMessage();
       }
     });
+
+    // =========================
+    // OBSŁUGA MIKROFONU
+    // =========================
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    let recognition = null;
+    let isRecording = false;
+
+    function setMicState(recording) {
+      isRecording = recording;
+
+      if (recording) {
+        micBtn.classList.add('recording');
+        micBtn.textContent = '⏹';
+      } else {
+        micBtn.classList.remove('recording');
+        micBtn.textContent = '🎤';
+      }
+    }
+
+    if (!SpeechRecognition) {
+      micBtn.disabled = true;
+      addMessage('Ta przeglądarka nie obsługuje rozpoznawania mowy.', 'system');
+    } else {
+      recognition = new SpeechRecognition();
+      recognition.lang = 'pl-PL';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.continuous = false;
+
+      recognition.onstart = function () {
+        setMicState(true);
+        addMessage('Nagrywanie rozpoczęte. Mów teraz...', 'system');
+      };
+
+      recognition.onresult = function (event) {
+        const transcript = event.results[0][0].transcript.trim();
+        removeLastSystemMessage();
+
+        if (transcript) {
+          textInput.value = transcript;
+          sendMessage(transcript);
+        } else {
+          addMessage('Nie rozpoznano wypowiedzi.', 'system');
+        }
+      };
+
+      recognition.onerror = function (event) {
+        removeLastSystemMessage();
+        setMicState(false);
+
+        let msg = 'Błąd mikrofonu.';
+        if (event.error === 'not-allowed') {
+          msg = 'Brak zgody na użycie mikrofonu.';
+        } else if (event.error === 'no-speech') {
+          msg = 'Nie wykryto mowy.';
+        } else if (event.error === 'audio-capture') {
+          msg = 'Nie wykryto mikrofonu.';
+        } else if (event.error === 'network') {
+          msg = 'Błąd sieci podczas rozpoznawania mowy.';
+        }
+
+        addMessage(msg, 'system');
+      };
+
+      recognition.onend = function () {
+        setMicState(false);
+      };
+
+      micBtn.addEventListener('click', function () {
+        if (sendBtn.disabled) return;
+
+        if (isRecording) {
+          recognition.stop();
+          return;
+        }
+
+        try {
+          recognition.start();
+        } catch (error) {
+          console.error(error);
+          addMessage('Nie udało się uruchomić mikrofonu.', 'system');
+          setMicState(false);
+        }
+      });
+    }
   </script>
 </body>
 </html>
