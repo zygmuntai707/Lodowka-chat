@@ -124,7 +124,6 @@
   </div>
 
   <script>
-    // WSTAW TU PRODUKCYJNY WEBHOOK, NIE webhook-test
     const WEBHOOK_URL = 'https://primary-production-fb3d1.up.railway.app/webhook/ea0f0408-3c60-4580-bb5c-bd138cb2ad8b';
 
     const chat = document.getElementById('chat');
@@ -157,11 +156,7 @@
     function setSendingState(isSending) {
       sendBtn.disabled = isSending;
       textInput.disabled = isSending;
-      if (isSending) {
-        micBtn.disabled = true;
-      } else {
-        micBtn.disabled = false;
-      }
+      micBtn.disabled = isSending;
     }
 
     async function sendMessage(customText = null) {
@@ -170,6 +165,10 @@
 
       addMessage(text, 'user');
       textInput.value = '';
+
+      // Schowaj klawiaturę po wysłaniu wiadomości
+      textInput.blur();
+
       setSendingState(true);
       addMessage('Przetwarzam...', 'system');
 
@@ -201,7 +200,6 @@
         console.error(error);
       } finally {
         setSendingState(false);
-        textInput.focus();
       }
     }
 
@@ -213,10 +211,6 @@
         sendMessage();
       }
     });
-
-    // =========================
-    // OBSŁUGA MIKROFONU
-    // =========================
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -287,6 +281,9 @@
       micBtn.addEventListener('click', function () {
         if (sendBtn.disabled) return;
 
+        // Dodatkowo zdejmij fokus z pola tekstowego przed startem nagrywania
+        textInput.blur();
+
         if (isRecording) {
           recognition.stop();
           return;
@@ -299,6 +296,11 @@
           addMessage('Nie udało się uruchomić mikrofonu.', 'system');
           setMicState(false);
         }
+      });
+    }
+  </script>
+</body>
+</html>
       });
     }
   </script>
