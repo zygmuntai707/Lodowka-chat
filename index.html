@@ -35,10 +35,12 @@
 
     .message {
       max-width: 80%;
-      padding: 10px;
+      padding: 10px 12px;
       border-radius: 12px;
       font-size: 16px;
       line-height: 1.4;
+      word-wrap: break-word;
+      white-space: pre-wrap;
     }
 
     .user {
@@ -69,6 +71,7 @@
       font-size: 16px;
       border-radius: 8px;
       border: 1px solid #ccc;
+      min-width: 0;
     }
 
     button {
@@ -77,6 +80,8 @@
       border: none;
       border-radius: 8px;
       color: white;
+      cursor: pointer;
+      flex-shrink: 0;
     }
 
     #sendBtn {
@@ -90,20 +95,48 @@
 </head>
 
 <body>
+  <header>Lodówki AI</header>
 
-<header>Lodówki AI</header>
+  <div id="chat">
+    <div class="message bot">Witaj. Powiedz co chcesz zrobić.</div>
+  </div>
 
-<div id="chat">
-  <div class="message bot">Witaj. Powiedz co chcesz zrobić.</div>
-  <div class="message user">Gdzie jest kurczak?</div>
-  <div class="message bot">Poniżej lokalizacja produktu...</div>
-</div>
+  <div id="inputBar">
+    <button id="micBtn" type="button">🎤</button>
+    <input id="textInput" type="text" placeholder="Napisz wiadomość..." />
+    <button id="sendBtn" type="button">Wyślij</button>
+  </div>
 
-<div id="inputBar">
-  <button id="micBtn">🎤</button>
-  <input id="textInput" placeholder="Napisz wiadomość..." />
-  <button id="sendBtn">Wyślij</button>
-</div>
+  <script>
+    const chat = document.getElementById('chat');
+    const textInput = document.getElementById('textInput');
+    const sendBtn = document.getElementById('sendBtn');
 
+    function addMessage(text, type) {
+      const msg = document.createElement('div');
+      msg.className = `message ${type}`;
+      msg.textContent = text;
+      chat.appendChild(msg);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function sendMessage() {
+      const text = textInput.value.trim();
+      if (!text) return;
+
+      addMessage(text, 'user');
+      textInput.value = '';
+      textInput.focus();
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+
+    textInput.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        sendMessage();
+      }
+    });
+  </script>
 </body>
 </html>
